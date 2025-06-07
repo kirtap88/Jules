@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: sans-serif; margin: 0; padding: 0; background-color: #f0f2f5; display: flex; color: #333; }
+        .sidebar { width: 300px; background-color: #2c3e50; color: white; padding: 15px; height: 100vh; overflow-y: auto; }
+        .sidebar h2 { border-bottom: 1px solid #34495e; padding-bottom: 10px; }
+        .main-content { flex-grow: 1; padding: 20px; height: 100vh; overflow-y: auto; }
+
+        #crypto-list { list-style-type: none; padding: 0; }
+        #crypto-list li {
+            background-color: #34495e; /* Darker background for list items */
+            margin-bottom: 8px;
+            padding: 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out;
+        }
+        #crypto-list li:hover { background-color: #4a627a; } /* Lighter hover */
+        .crypto-name { font-weight: bold; font-size: 1.1em; }
+        .crypto-price { font-size: 0.9em; color: #bdc3c7; } /* Lighter text for price */
+
+        #chart-container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-top: 20px; }
+        #trading-zone { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-top: 20px; }
+
+        .user-info { background-color: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom:20px; }
+        .user-info label { margin-right: 5px; }
+        .user-info input { padding: 8px; border-radius: 4px; border: 1px solid #ddd; margin-right: 10px;}
+
+        #trading-zone h3 { margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        #trading-zone label { display: block; margin: 10px 0 5px; }
+        #trading-zone input[type="number"] { width: calc(100% - 22px); padding: 10px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 15px; }
+        #trading-zone button {
+            background-color: #3498db; /* Blue for buy */
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1em;
+            margin-right: 10px;
+            transition: background-color 0.2s;
+        }
+        #trading-zone button.sell-btn { background-color: #e74c3c; /* Red for sell */ }
+        #trading-zone button:hover { opacity: 0.85; }
+        #trade-message { margin-top: 15px; font-weight: bold; }
+        #selected-crypto-name { font-size: 1.5em; font-weight: bold; color: #2c3e50; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h2>Cryptocurrencies</h2>
+        <ul id="crypto-list"><li>Loading...</li></ul>
+    </div>
+
+    <div class="main-content">
+        <div class="user-info">
+            <label for="user-id">User ID:</label>
+            <input type="number" id="user-id" placeholder="Enter User ID (e.g., 1)" value="1">
+            <!-- Pre-fill with 1 for easier testing after registering user 1 -->
+            <label for="virtual-balance">Balance: $</label>
+            <span id="virtual-balance-display">N/A</span>
+            <button id="fetch-balance-btn">Load/Refresh Balance</button>
+            <p style="font-size:0.8em; color: #777;">Note: Register user via API first. Then enter User ID here and load balance.</p>
+        </div>
+
+        <h1 id="selected-crypto-name">Select a cryptocurrency</h1>
+
+        <div id="trading-zone" style="display:none;"> <!-- Hidden initially -->
+            <h3>Trade <span id="trade-crypto-symbol"></span></h3>
+            <label for="quantity">Quantity:</label>
+            <input type="number" id="quantity" placeholder="Enter amount">
+            <button id="buy-btn">Buy</button>
+            <button id="sell-btn" class="sell-btn">Sell</button>
+            <div id="trade-message"></div>
+        </div>
+
+        <div id="chart-container">
+            <canvas id="priceChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        let currentChart = null;
+        let selectedCrypto = { id: null, name: null, symbol: null };
+
+        document.addEventListener('DOMContentLoaded', function() {
+            fetchCryptoList();
+            document.getElementById('fetch-balance-btn').addEventListener('click', fetchUserBalance);
+            document.getElementById('buy-btn').addEventListener('click', () => handleTrade('buy'));
+            document.getElementById('sell-btn').addEventListener('click', () => handleTrade('sell'));
+        });
+
+        function fetchCryptoList() {
+            fetch('/api/cryptos')
+                .then(response => response.json())
+                .then(data => {
+                    const cryptoListEl = document.getElementById('crypto-list');
+                    cryptoListEl.innerHTML = '';
+                    if (data && data.length > 0) {
+                        data.forEach(crypto => {
+                            const listItem = document.createElement('li');
+                            listItem.setAttribute('data-id', crypto.id);
+                            listItem.setAttribute('data-name', crypto.name);
+                            listItem.setAttribute('data-symbol', crypto.symbol.toUpperCase());
+
+                            const nameSpan = document.createElement('span');
+                            nameSpan.className = 'crypto-name';
+                            nameSpan.textContent = crypto.name + ' (' + crypto.symbol.toUpperCase() + ')';
+
+                            const priceSpan = document.createElement('span');
+                            priceSpan.className = 'crypto-price';
+                            priceSpan.textContent = ' - $' + (crypto.current_price ? crypto.current_price.toLocaleString() : 'N/A');
+
+                            listItem.appendChild(nameSpan);
+                            listItem.appendChild(priceSpan);
+
+                            listItem.addEventListener('click', function() {
+                                selectedCrypto.id = this.getAttribute('data-id');
+                                selectedCrypto.name = this.getAttribute('data-name');
+                                selectedCrypto.symbol = this.getAttribute('data-symbol');
+
+                                document.getElementById('selected-crypto-name').textContent = 'Chart for: ' + selectedCrypto.name;
+                                document.getElementById('trade-crypto-symbol').textContent = selectedCrypto.symbol;
+                                document.getElementById('trading-zone').style.display = 'block';
+                                document.getElementById('trade-message').textContent = ''; // Clear previous messages
+                                document.getElementById('quantity').value = ''; // Clear quantity
+                                fetchCryptoHistory(selectedCrypto.id);
+                            });
+                            cryptoListEl.appendChild(listItem);
+                        });
+                    } else {
+                        cryptoListEl.innerHTML = '<li>Failed to load cryptocurrency data.</li>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching crypto list:', error);
+                    document.getElementById('crypto-list').innerHTML = '<li>Error loading data.</li>';
+                });
+        }
+
+        function fetchUserBalance() {
+            const userId = document.getElementById('user-id').value;
+            if (!userId) {
+                alert("Please enter a User ID.");
+                return;
+            }
+            // This is a conceptual fetch. Actual user data would come from login response.
+            // For now, we don't have a dedicated /api/user/<id>/balance endpoint.
+            // We will simulate this by trying to re-fetch user info via a "login" if we had one,
+            // or just display what was last known. The trading response will update balance.
+            // For now, let's just say "Balance updates after trade or if manually set from login".
+            // The login endpoint returns balance, so if we had stored that it would be used.
+            // Let's assume the user is "logged in" and we have their balance from that.
+            // For this step, we'll primarily rely on the trade response to update the balance display.
+            // A dedicated endpoint /api/user/details or similar would be better.
+
+            // To make this somewhat functional for testing:
+            // We can try to "re-login" to get the fresh balance if an actual login endpoint exists
+            // and if we had credentials. This is hacky.
+            // A proper way would be a dedicated endpoint that returns current user's data based on a session/token.
+
+            // For now, let's just clear it and say it updates on trade
+            document.getElementById('virtual-balance-display').textContent = "Updates on trade";
+             alert("User balance will be updated after a successful trade or upon login. For now, ensure User ID is correct for trades.");
+        }
+
+
+        function fetchCryptoHistory(cryptoId) {
+            fetch(\`/api/history/\${cryptoId}?days=30\`)
+                .then(response => response.json())
+                .then(historyData => {
+                    if (historyData && historyData.prices && historyData.prices.length > 0) {
+                        renderChart(historyData.prices);
+                    } else {
+                        if (currentChart) currentChart.destroy();
+                        document.getElementById('selected-crypto-name').textContent = 'No chart data for ' + selectedCrypto.name;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching crypto history:', error);
+                     if (currentChart) currentChart.destroy();
+                });
+        }
+
+        function renderChart(priceData) {
+            const ctx = document.getElementById('priceChart').getContext('2d');
+            if (currentChart) currentChart.destroy();
+            const labels = priceData.map(item => new Date(item[0]).toLocaleDateString());
+            const dataPoints = priceData.map(item => item[1]);
+            currentChart = new Chart(ctx, {
+                type: 'line', data: { labels: labels, datasets: [{ label: 'Price (USD)', data: dataPoints, borderColor: 'rgb(75, 192, 192)', tension: 0.1 }] },
+                options: { responsive: true, maintainAspectRatio: true, scales: { x: { title: { display: true, text: 'Date' }}, y: { title: { display: true, text: 'Price (USD)' }} }}
+            });
+        }
+
+        function handleTrade(type) {
+            const userId = document.getElementById('user-id').value;
+            const quantity = document.getElementById('quantity').value;
+            const tradeMessageEl = document.getElementById('trade-message');
+
+            if (!userId) {
+                tradeMessageEl.textContent = 'Error: User ID is required.';
+                tradeMessageEl.style.color = 'red';
+                return;
+            }
+            if (!selectedCrypto.id) {
+                tradeMessageEl.textContent = 'Error: No cryptocurrency selected.';
+                tradeMessageEl.style.color = 'red';
+                return;
+            }
+            if (!quantity || parseFloat(quantity) <= 0) {
+                tradeMessageEl.textContent = 'Error: Please enter a valid quantity.';
+                tradeMessageEl.style.color = 'red';
+                return;
+            }
+
+            tradeMessageEl.textContent = 'Processing...';
+            tradeMessageEl.style.color = 'orange';
+
+            fetch(\`/api/trade/\${type}\`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: parseInt(userId),
+                    crypto_id: selectedCrypto.id,
+                    quantity: parseFloat(quantity) // Ensure quantity is a number
+                })
+            })
+            .then(response => response.json().then(data => ({ ok: response.ok, status: response.status, body: data })))
+            .then(res => {
+                if (res.ok) {
+                    tradeMessageEl.textContent = \`Success: \${res.body.message}\`;
+                    tradeMessageEl.style.color = 'green';
+                    if(res.body.new_virtual_balance !== undefined) {
+                        document.getElementById('virtual-balance-display').textContent = parseFloat(res.body.new_virtual_balance).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                    }
+                    // TODO: Update portfolio display in the next step
+                } else {
+                    tradeMessageEl.textContent = \`Error (\${res.status}): \${res.body.error || 'Trade failed'}\`;
+                    tradeMessageEl.style.color = 'red';
+                }
+            })
+            .catch(error => {
+                console.error('Trade error:', error);
+                tradeMessageEl.textContent = 'Error: An unexpected error occurred. Check console.';
+                tradeMessageEl.style.color = 'red';
+            });
+        }
+    </script>
+</body>
+</html>
