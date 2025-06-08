@@ -3,3 +3,15 @@ requests==2.31.0
 Flask-SQLAlchemy==3.1.1
 Flask-Migrate==4.0.5
 python-dotenv==1.0.0
+pytest
+werkzeug==3.0.3 # Pinned to a specific version
+click>=8.1.3 # Added as it's a Flask CLI dependency
+blinker>=1.6.2 # Flask signals
+Jinja2>=3.1.2 # Flask templating
+itsdangerous>=2.1.2 # Flask security
+SQLAlchemy>=2.0.16 # For Flask-SQLAlchemy
+Alembic>=1.9.0 # For Flask-Migrate
+Mako # For Alembic templates
+greenlet>=1.0 # For SQLAlchemy async (though not directly used, often a dep)
+numpy # Added for strategies.py
+yfinance # For fetching stock data from Yahoo Finance

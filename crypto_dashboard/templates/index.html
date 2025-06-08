@@ -11,67 +11,74 @@
         .sidebar h2 { border-bottom: 1px solid #34495e; padding-bottom: 10px; }
         .main-content { flex-grow: 1; padding: 20px; height: 100vh; overflow-y: auto; }
 
-        #crypto-list { list-style-type: none; padding: 0; }
-        #crypto-list li {
-            background-color: #34495e; /* Darker background for list items */
-            margin-bottom: 8px;
-            padding: 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background-color 0.2s ease-in-out;
+        #asset-list { list-style-type: none; padding: 0; }
+        #asset-list li {
+            background-color: #34495e; margin-bottom: 8px; padding: 12px; border-radius: 4px;
+            cursor: pointer; transition: background-color 0.2s ease-in-out;
         }
-        #crypto-list li:hover { background-color: #4a627a; } /* Lighter hover */
-        .crypto-name { font-weight: bold; font-size: 1.1em; }
-        .crypto-price { font-size: 0.9em; color: #bdc3c7; } /* Lighter text for price */
+        #asset-list li:hover { background-color: #4a627a; }
+        .asset-name { font-weight: bold; font-size: 1.1em; }
+        .asset-price { font-size: 0.9em; color: #bdc3c7; }
 
-        #chart-container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-top: 20px; }
-        #trading-zone { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-top: 20px; }
-
+        #chart-container, #trading-zone, #backtesting-zone { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-top: 20px; }
         .user-info { background-color: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom:20px; }
-        .user-info label { margin-right: 5px; }
-        .user-info input { padding: 8px; border-radius: 4px; border: 1px solid #ddd; margin-right: 10px;}
-
-        #trading-zone h3 { margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px; }
-        #trading-zone label { display: block; margin: 10px 0 5px; }
-        #trading-zone input[type="number"] { width: calc(100% - 22px); padding: 10px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 15px; }
-        #trading-zone button {
-            background-color: #3498db; /* Blue for buy */
-            color: white;
-            border: none;
-            padding: 10px 15px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 1em;
-            margin-right: 10px;
-            transition: background-color 0.2s;
+        .user-info label, #trading-zone label, #backtesting-zone label { margin-right: 5px; display: block; margin-bottom: 5px; }
+        .user-info input, #trading-zone input[type="number"], #backtesting-zone input[type="number"], #backtesting-zone select {
+            padding: 8px; border-radius: 4px; border: 1px solid #ddd; margin-right: 10px; width: calc(100% - 20px); margin-bottom:10px;
         }
-        #trading-zone button.sell-btn { background-color: #e74c3c; /* Red for sell */ }
-        #trading-zone button:hover { opacity: 0.85; }
+        #trading-zone h3, #backtesting-zone h3 { margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        #trading-zone button, #backtesting-zone button {
+            background-color: #3498db; color: white; border: none; padding: 10px 15px;
+            border-radius: 4px; cursor: pointer; font-size: 1em; margin-right: 10px; transition: background-color 0.2s;
+        }
+        #trading-zone button.sell-btn { background-color: #e74c3c; }
+        #backtesting-zone button { background-color: #27ae60; margin-top:10px;}
+        #backtesting-zone button#add-strategy-btn { background-color: #3498db; }
+
+        #trading-zone button:hover, #backtesting-zone button:hover { opacity: 0.85; }
         #trade-message { margin-top: 15px; font-weight: bold; }
-        #selected-crypto-name { font-size: 1.5em; font-weight: bold; color: #2c3e50; }
+        #selected-asset-name { font-size: 1.5em; font-weight: bold; color: #2c3e50; }
+
+        .strategy-row { border: 1px solid #eee; padding: 10px; margin-bottom: 10px; border-radius: 4px; background-color: #f9f9f9;}
+        .strategy-row label { font-size: 0.9em; }
+        .strategy-row select, .strategy-row input { width: auto; margin-right:8px; margin-bottom:5px; padding:6px;}
+        .remove-strategy-btn { background-color: #e74c3c !important; font-size:0.8em !important; padding: 5px 10px !important; float:right;}
+        #strategy-params-area label {font-size: 0.9em; margin-right: 5px;}
+        #strategy-params-area input {width: auto; padding: 8px; margin-left:5px;}
+        #strategy-params-area div { margin-bottom: 5px; }
+
+
+        #backtest-loading-message { margin-top:15px; color: orange; }
+        #backtest-results-summary { margin-top: 15px; padding:10px; border: 1px solid #eee; border-radius:4px; background-color: #f9f9f9;}
+        #backtest-results-summary p { margin: 5px 0; }
+        #backtest-results-chart-container { margin-top: 20px; }
+        #backtest-trades-log { margin-top: 20px; }
+        #backtest-trades-log h4 { margin-bottom: 5px; }
+        #backtest-trades-log table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+        #backtest-trades-log th, #backtest-trades-log td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+        #backtest-trades-log th { background-color: #f2f2f2; }
     </style>
 </head>
 <body>
     <div class="sidebar">
-        <h2>Cryptocurrencies</h2>
-        <ul id="crypto-list"><li>Loading...</li></ul>
+        <h2>Assets</h2>
+        <ul id="asset-list"><li>Loading...</li></ul>
     </div>
 
     <div class="main-content">
         <div class="user-info">
             <label for="user-id">User ID:</label>
             <input type="number" id="user-id" placeholder="Enter User ID (e.g., 1)" value="1">
-            <!-- Pre-fill with 1 for easier testing after registering user 1 -->
             <label for="virtual-balance">Balance: $</label>
             <span id="virtual-balance-display">N/A</span>
             <button id="fetch-balance-btn">Load/Refresh Balance</button>
             <p style="font-size:0.8em; color: #777;">Note: Register user via API first. Then enter User ID here and load balance.</p>
         </div>
 
-        <h1 id="selected-crypto-name">Select a cryptocurrency</h1>
+        <h1 id="selected-asset-name">Select an Asset</h1>
 
-        <div id="trading-zone" style="display:none;"> <!-- Hidden initially -->
-            <h3>Trade <span id="trade-crypto-symbol"></span></h3>
+        <div id="trading-zone" style="display:none;">
+            <h3>Trade <span id="trade-asset-symbol"></span></h3>
             <label for="quantity">Quantity:</label>
             <input type="number" id="quantity" placeholder="Enter amount">
             <button id="buy-btn">Buy</button>
@@ -82,175 +89,460 @@
         <div id="chart-container">
             <canvas id="priceChart"></canvas>
         </div>
+
+        <div id="backtesting-zone" style="display:none;">
+            <h3>Backtest Trading Strategies</h3>
+
+            <div id="combined-strategy-builder">
+                <button id="add-strategy-btn" type="button">Add Strategy to Combination</button>
+                <div id="selected-strategies-container" style="margin-top:10px;">
+                    <!-- Strategy rows will be added here -->
+                </div>
+                <label for="combination-logic">Combination Logic (if >1 strategy):</label>
+                <select id="combination-logic">
+                    <option value="">None (Single Strategy if 1 selected)</option>
+                    <option value="AND">AND</option>
+                    <option value="OR">OR</option>
+                    <option value="MAJORITY_VOTE">MAJORITY_VOTE</option>
+                </select>
+            </div>
+
+            <label for="backtest-initial-capital">Initial Capital:</label>
+            <input type="number" id="backtest-initial-capital" value="10000">
+            <label for="backtest-days-history">Days for History:</label>
+            <input type="number" id="backtest-days-history" value="90">
+            <label for="backtest-trade-quantity">Trade Quantity (for buy signals):</label>
+            <input type="number" id="backtest-trade-quantity" value="1.0" step="0.000001">
+
+            <label for="trade-style">Trading Style:</label>
+            <select id="trade-style">
+                <option value="default" selected>Default</option>
+                <option value="day_trader">Day Trader</option>
+                <!-- <option value="swing_trader">Swing Trader</option> -->
+                <!-- <option value="long_term_investor">Long Term Investor</option> -->
+            </select>
+
+            <button id="run-backtest-btn">Run Backtest</button>
+            <div id="backtest-loading-message" style="display:none;">Loading backtest results...</div>
+            <div id="backtest-results-summary" style="display:none;"><h4>Backtest Summary:</h4></div>
+            <div id="backtest-results-chart-container" style="display:none;">
+                <h4>Portfolio Value Over Time:</h4>
+                <canvas id="backtestChart"></canvas>
+            </div>
+            <div id="backtest-trades-log" style="display:none;"><h4>Trades Log:</h4></div>
+        </div>
     </div>
 
     <script>
-        let currentChart = null;
-        let selectedCrypto = { id: null, name: null, symbol: null };
+        let priceChartInstance = null;
+        let selectedAsset = { id: null, name: null, symbol: null, asset_type: 'crypto', exchange: null };
+        let baseStrategiesData = {};
+        let backtestChartInstance = null;
+        let strategyRowCount = 0;
 
         document.addEventListener('DOMContentLoaded', function() {
-            fetchCryptoList();
+            fetchAssetList();
+            fetchBaseStrategies();
             document.getElementById('fetch-balance-btn').addEventListener('click', fetchUserBalance);
             document.getElementById('buy-btn').addEventListener('click', () => handleTrade('buy'));
             document.getElementById('sell-btn').addEventListener('click', () => handleTrade('sell'));
+            document.getElementById('add-strategy-btn').addEventListener('click', addStrategyRow);
+            document.getElementById('run-backtest-btn').addEventListener('click', runBacktestHandler);
+            document.getElementById('selected-asset-name').textContent = 'Select an Asset';
+            addStrategyRow();
         });
 
-        function fetchCryptoList() {
-            fetch('/api/cryptos')
+        function resetBacktestUI() {
+            document.getElementById('backtest-results-summary').style.display = 'none';
+            document.getElementById('backtest-results-summary').innerHTML = '<h4>Backtest Summary:</h4>';
+            document.getElementById('backtest-results-chart-container').style.display = 'none';
+            if (backtestChartInstance) backtestChartInstance.destroy();
+            document.getElementById('backtest-trades-log').style.display = 'none';
+            document.getElementById('backtest-trades-log').innerHTML = '<h4>Trades Log:</h4>';
+            document.getElementById('backtest-loading-message').style.display = 'none';
+        }
+
+        function fetchAssetList() {
+            fetch('/api/assets')
                 .then(response => response.json())
                 .then(data => {
-                    const cryptoListEl = document.getElementById('crypto-list');
-                    cryptoListEl.innerHTML = '';
+                    const assetListEl = document.getElementById('asset-list');
+                    assetListEl.innerHTML = '';
                     if (data && data.length > 0) {
-                        data.forEach(crypto => {
+                        data.forEach(asset => {
                             const listItem = document.createElement('li');
-                            listItem.setAttribute('data-id', crypto.id);
-                            listItem.setAttribute('data-name', crypto.name);
-                            listItem.setAttribute('data-symbol', crypto.symbol.toUpperCase());
+                            listItem.setAttribute('data-id', asset.id);
+                            listItem.setAttribute('data-name', asset.name);
+                            listItem.setAttribute('data-symbol', asset.symbol.toUpperCase());
+                            listItem.setAttribute('data-asset-type', asset.asset_type);
+                            listItem.setAttribute('data-exchange', asset.exchange || '');
 
                             const nameSpan = document.createElement('span');
-                            nameSpan.className = 'crypto-name';
-                            nameSpan.textContent = crypto.name + ' (' + crypto.symbol.toUpperCase() + ')';
+                            nameSpan.className = 'asset-name';
+                            let displayName = `${asset.name} (${asset.symbol.toUpperCase()})`;
+                            if (asset.asset_type === 'stock') {
+                                displayName += ` (Stock - ${asset.exchange || 'N/A'})`;
+                            } else {
+                                displayName += ` (Crypto)`;
+                            }
+                            nameSpan.textContent = displayName;
 
                             const priceSpan = document.createElement('span');
-                            priceSpan.className = 'crypto-price';
-                            priceSpan.textContent = ' - $' + (crypto.current_price ? crypto.current_price.toLocaleString() : 'N/A');
-
+                            priceSpan.className = 'asset-price';
+                             try {
+                                priceSpan.textContent = ' - $' + (asset.current_price ? parseFloat(asset.current_price).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 8}) : 'N/A');
+                            } catch (e) {
+                                console.error("Error formatting price for asset:", asset, e);
+                                priceSpan.textContent = ' - $N/A';
+                            }
                             listItem.appendChild(nameSpan);
                             listItem.appendChild(priceSpan);
-
                             listItem.addEventListener('click', function() {
-                                selectedCrypto.id = this.getAttribute('data-id');
-                                selectedCrypto.name = this.getAttribute('data-name');
-                                selectedCrypto.symbol = this.getAttribute('data-symbol');
-
-                                document.getElementById('selected-crypto-name').textContent = 'Chart for: ' + selectedCrypto.name;
-                                document.getElementById('trade-crypto-symbol').textContent = selectedCrypto.symbol;
+                                selectedAsset.id = this.getAttribute('data-id');
+                                selectedAsset.name = this.getAttribute('data-name');
+                                selectedAsset.symbol = this.getAttribute('data-symbol');
+                                selectedAsset.asset_type = this.getAttribute('data-asset-type');
+                                selectedAsset.exchange = this.getAttribute('data-exchange');
+                                document.getElementById('selected-asset-name').textContent = 'Chart for: ' + selectedAsset.name;
+                                document.getElementById('trade-asset-symbol').textContent = selectedAsset.symbol;
                                 document.getElementById('trading-zone').style.display = 'block';
-                                document.getElementById('trade-message').textContent = ''; // Clear previous messages
-                                document.getElementById('quantity').value = ''; // Clear quantity
-                                fetchCryptoHistory(selectedCrypto.id);
+                                document.getElementById('backtesting-zone').style.display = 'block';
+                                document.getElementById('trade-message').textContent = '';
+                                document.getElementById('quantity').value = '';
+                                fetchAssetHistory(selectedAsset.id, selectedAsset.asset_type);
+                                resetBacktestUI();
                             });
-                            cryptoListEl.appendChild(listItem);
+                            assetListEl.appendChild(listItem);
                         });
                     } else {
-                        cryptoListEl.innerHTML = '<li>Failed to load cryptocurrency data.</li>';
+                        assetListEl.innerHTML = '<li>Failed to load asset data.</li>';
                     }
                 })
                 .catch(error => {
-                    console.error('Error fetching crypto list:', error);
-                    document.getElementById('crypto-list').innerHTML = '<li>Error loading data.</li>';
+                    console.error('Error fetching asset list:', error);
+                    document.getElementById('asset-list').innerHTML = '<li>Error loading data.</li>';
                 });
+        }
+
+        function fetchBaseStrategies() {
+            fetch('/api/strategies')
+                .then(response => response.json())
+                .then(data => {
+                    baseStrategiesData = {};
+                    data.forEach(strategy => {
+                        baseStrategiesData[strategy.id] = strategy;
+                    });
+                    const existingRows = document.querySelectorAll('.strategy-row');
+                    existingRows.forEach(row => {
+                        const selectEl = row.querySelector('.strategy-select');
+                        if (selectEl && selectEl.options.length <=1) populateStrategyDropdown(selectEl);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error fetching strategies:', error);
+                });
+        }
+
+        function populateStrategyDropdown(selectElement) {
+            selectElement.innerHTML = '<option value="">-- Select Strategy --</option>';
+            for (const strategyId in baseStrategiesData) {
+                const option = document.createElement('option');
+                option.value = strategyId;
+                option.textContent = baseStrategiesData[strategyId].name;
+                selectElement.appendChild(option);
+            }
+        }
+
+        function addStrategyRow() {
+            strategyRowCount++;
+            const container = document.getElementById('selected-strategies-container');
+            const strategyRow = document.createElement('div');
+            strategyRow.className = 'strategy-row';
+            strategyRow.setAttribute('data-row-id', strategyRowCount);
+
+            const selectLabel = document.createElement('label');
+            selectLabel.textContent = `Strategy ${strategyRowCount}: `;
+            const strategySelect = document.createElement('select');
+            strategySelect.className = 'strategy-select';
+            strategySelect.setAttribute('data-row-id', strategyRowCount);
+            populateStrategyDropdown(strategySelect);
+
+            const paramsContainer = document.createElement('div');
+            paramsContainer.className = 'strategy-params-area';
+            paramsContainer.id = `strategy-params-area-${strategyRowCount}`;
+            paramsContainer.innerHTML = '<p>Select a strategy to see its parameters.</p>';
+
+            const removeBtn = document.createElement('button');
+            removeBtn.textContent = 'Remove';
+            removeBtn.className = 'remove-strategy-btn';
+            removeBtn.type = 'button';
+            removeBtn.onclick = function() { strategyRow.remove(); };
+
+            strategySelect.onchange = function() {
+                populateStrategyParamsForRow(this.value, paramsContainer, strategyRowCount);
+            };
+
+            strategyRow.appendChild(selectLabel);
+            strategyRow.appendChild(strategySelect);
+            strategyRow.appendChild(removeBtn);
+            strategyRow.appendChild(paramsContainer);
+            container.appendChild(strategyRow);
+        }
+
+        function populateStrategyParamsForRow(strategyId, paramsContainerEl, rowId) {
+            paramsContainerEl.innerHTML = '';
+            if (strategyId && baseStrategiesData[strategyId] && baseStrategiesData[strategyId].params) {
+                baseStrategiesData[strategyId].params.forEach(param => {
+                    const paramDiv = document.createElement('div');
+                    const label = document.createElement('label');
+                    label.textContent = param.label || param.name;
+                    const inputId = `param-${param.name}-row${rowId}`;
+                    label.htmlFor = inputId;
+
+                    const input = document.createElement('input');
+                    input.type = param.type === 'int' || param.type === 'float' ? 'number' : 'text';
+                    input.id = inputId;
+                    input.name = param.name;
+                    if (param.default !== undefined) {
+                        input.value = param.default;
+                    }
+                    if (param.type === 'float' || param.name === 'std_devs') input.step = "0.1";
+                    else if (param.type === 'int') input.step = "1";
+
+                    paramDiv.appendChild(label);
+                    paramDiv.appendChild(input);
+                    paramsContainerEl.appendChild(paramDiv);
+                });
+            } else {
+                paramsContainerEl.innerHTML = '<p>Select a strategy to see its parameters.</p>';
+            }
         }
 
         function fetchUserBalance() {
             const userId = document.getElementById('user-id').value;
-            if (!userId) {
-                alert("Please enter a User ID.");
-                return;
-            }
-            // This is a conceptual fetch. Actual user data would come from login response.
-            // For now, we don't have a dedicated /api/user/<id>/balance endpoint.
-            // We will simulate this by trying to re-fetch user info via a "login" if we had one,
-            // or just display what was last known. The trading response will update balance.
-            // For now, let's just say "Balance updates after trade or if manually set from login".
-            // The login endpoint returns balance, so if we had stored that it would be used.
-            // Let's assume the user is "logged in" and we have their balance from that.
-            // For this step, we'll primarily rely on the trade response to update the balance display.
-            // A dedicated endpoint /api/user/details or similar would be better.
-
-            // To make this somewhat functional for testing:
-            // We can try to "re-login" to get the fresh balance if an actual login endpoint exists
-            // and if we had credentials. This is hacky.
-            // A proper way would be a dedicated endpoint that returns current user's data based on a session/token.
-
-            // For now, let's just clear it and say it updates on trade
+            if (!userId) { alert("Please enter a User ID."); return; }
             document.getElementById('virtual-balance-display').textContent = "Updates on trade";
-             alert("User balance will be updated after a successful trade or upon login. For now, ensure User ID is correct for trades.");
+            alert("User balance will be updated after a successful trade or upon login. For now, ensure User ID is correct for trades.");
         }
-
-
-        function fetchCryptoHistory(cryptoId) {
-            fetch(\`/api/history/\${cryptoId}?days=30\`)
+        function fetchAssetHistory(assetId, assetType = 'crypto') {
+            fetch(\`/api/history/\${assetId}?days=30&asset_type=\${assetType}\`)
                 .then(response => response.json())
                 .then(historyData => {
                     if (historyData && historyData.prices && historyData.prices.length > 0) {
-                        renderChart(historyData.prices);
+                        renderPriceChart(historyData.prices);
                     } else {
-                        if (currentChart) currentChart.destroy();
-                        document.getElementById('selected-crypto-name').textContent = 'No chart data for ' + selectedCrypto.name;
+                        if (priceChartInstance) priceChartInstance.destroy();
+                        document.getElementById('selected-asset-name').textContent = 'No chart data for ' + selectedAsset.name;
                     }
                 })
-                .catch(error => {
-                    console.error('Error fetching crypto history:', error);
-                     if (currentChart) currentChart.destroy();
-                });
+                .catch(error => { console.error('Error fetching asset history:', error); if (priceChartInstance) priceChartInstance.destroy(); });
         }
-
-        function renderChart(priceData) {
+        function renderPriceChart(priceData) {
             const ctx = document.getElementById('priceChart').getContext('2d');
-            if (currentChart) currentChart.destroy();
+            if (priceChartInstance) priceChartInstance.destroy();
             const labels = priceData.map(item => new Date(item[0]).toLocaleDateString());
-            const dataPoints = priceData.map(item => item[1]);
-            currentChart = new Chart(ctx, {
+            const dataPoints = priceData.map(item => parseFloat(item[1]));
+            priceChartInstance = new Chart(ctx, {
                 type: 'line', data: { labels: labels, datasets: [{ label: 'Price (USD)', data: dataPoints, borderColor: 'rgb(75, 192, 192)', tension: 0.1 }] },
                 options: { responsive: true, maintainAspectRatio: true, scales: { x: { title: { display: true, text: 'Date' }}, y: { title: { display: true, text: 'Price (USD)' }} }}
             });
         }
-
         function handleTrade(type) {
             const userId = document.getElementById('user-id').value;
             const quantity = document.getElementById('quantity').value;
             const tradeMessageEl = document.getElementById('trade-message');
-
-            if (!userId) {
-                tradeMessageEl.textContent = 'Error: User ID is required.';
-                tradeMessageEl.style.color = 'red';
-                return;
-            }
-            if (!selectedCrypto.id) {
-                tradeMessageEl.textContent = 'Error: No cryptocurrency selected.';
-                tradeMessageEl.style.color = 'red';
-                return;
-            }
-            if (!quantity || parseFloat(quantity) <= 0) {
-                tradeMessageEl.textContent = 'Error: Please enter a valid quantity.';
-                tradeMessageEl.style.color = 'red';
-                return;
-            }
-
-            tradeMessageEl.textContent = 'Processing...';
-            tradeMessageEl.style.color = 'orange';
-
+            if (!userId) { tradeMessageEl.textContent = 'Error: User ID is required.'; tradeMessageEl.style.color = 'red'; return; }
+            if (!selectedAsset.id) { tradeMessageEl.textContent = 'Error: No asset selected.'; tradeMessageEl.style.color = 'red'; return; }
+            if (!quantity || parseFloat(quantity) <= 0) { tradeMessageEl.textContent = 'Error: Please enter a valid quantity.'; tradeMessageEl.style.color = 'red'; return; }
+            tradeMessageEl.textContent = 'Processing...'; tradeMessageEl.style.color = 'orange';
+            const tradePayload = {
+                user_id: parseInt(userId), asset_id: selectedAsset.id, asset_type: selectedAsset.asset_type,
+                exchange: selectedAsset.exchange, quantity: parseFloat(quantity)
+            };
             fetch(\`/api/trade/\${type}\`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    user_id: parseInt(userId),
-                    crypto_id: selectedCrypto.id,
-                    quantity: parseFloat(quantity) // Ensure quantity is a number
-                })
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(tradePayload)
             })
             .then(response => response.json().then(data => ({ ok: response.ok, status: response.status, body: data })))
             .then(res => {
                 if (res.ok) {
-                    tradeMessageEl.textContent = \`Success: \${res.body.message}\`;
-                    tradeMessageEl.style.color = 'green';
+                    tradeMessageEl.textContent = \`Success: \${res.body.message}\`; tradeMessageEl.style.color = 'green';
                     if(res.body.new_virtual_balance !== undefined) {
                         document.getElementById('virtual-balance-display').textContent = parseFloat(res.body.new_virtual_balance).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
                     }
-                    // TODO: Update portfolio display in the next step
                 } else {
-                    tradeMessageEl.textContent = \`Error (\${res.status}): \${res.body.error || 'Trade failed'}\`;
-                    tradeMessageEl.style.color = 'red';
+                    tradeMessageEl.textContent = \`Error (\${res.status}): \${res.body.error || 'Trade failed'}\`; tradeMessageEl.style.color = 'red';
+                }
+            }).catch(error => {
+                console.error('Trade error:', error);
+                tradeMessageEl.textContent = 'Error: An unexpected error occurred. Check console.'; tradeMessageEl.style.color = 'red';
+            });
+        }
+
+        function runBacktestHandler() {
+            const assetId = selectedAsset.id;
+            const assetType = selectedAsset.asset_type;
+            const initialCapital = document.getElementById('backtest-initial-capital').value;
+            const days = document.getElementById('backtest-days-history').value;
+            const tradeQuantity = document.getElementById('backtest-trade-quantity').value;
+            const combinationLogic = document.getElementById('combination-logic').value || null;
+            const tradeStyle = document.getElementById('trade-style').value; // Get selected trade style
+
+            const loadingMsg = document.getElementById('backtest-loading-message');
+            const resultsSummaryDiv = document.getElementById('backtest-results-summary');
+            const chartContainerDiv = document.getElementById('backtest-results-chart-container');
+            const tradesLogDiv = document.getElementById('backtest-trades-log');
+
+            if (!assetId) { alert("Please select an asset first."); return; }
+            if (parseFloat(initialCapital) <= 0) { alert("Initial capital must be positive."); return; }
+            if (parseInt(days) <= 0) { alert("Days for history must be a positive integer."); return; }
+            if (parseFloat(tradeQuantity) <= 0) { alert("Trade quantity must be positive."); return; }
+
+            const strategiesForPayload = [];
+            const strategyRows = document.querySelectorAll('#selected-strategies-container .strategy-row');
+
+            if (strategyRows.length === 0) {
+                alert("Please add at least one strategy for backtesting.");
+                return;
+            }
+            const finalCombinationLogic = strategyRows.length > 1 ? (combinationLogic === "" ? null : combinationLogic) : null;
+
+            if (strategyRows.length > 1 && !finalCombinationLogic) {
+                 alert("Multiple strategies provided but no combination logic selected. Please select a logic.");
+                 return;
+            }
+             // This validation was a bit too strict, combinationLogic can be "" (None) for single strategy too
+             // if (finalCombinationLogic && strategyRows.length < 2) {
+             //    alert("Combination logic selected but less than two strategies are added.");
+             //    return;
+            // }
+
+            for (let i = 0; i < strategyRows.length; i++) {
+                const row = strategyRows[i];
+                const strategySelect = row.querySelector('.strategy-select');
+                const strategyId = strategySelect.value;
+                if (!strategyId) {
+                    alert(\`Please select a strategy for row \${i + 1}.\`);
+                    return;
+                }
+                const currentStrategyDef = baseStrategiesData[strategyId];
+                const params = {};
+                if (currentStrategyDef && currentStrategyDef.params) {
+                    currentStrategyDef.params.forEach(paramInfo => {
+                        const inputEl = document.getElementById(`param-\${paramInfo.name}-row\${row.getAttribute('data-row-id')}`);
+                        if (inputEl) {
+                            if (paramInfo.type === 'int') params[paramInfo.name] = parseInt(inputEl.value);
+                            else if (paramInfo.type === 'float' || paramInfo.name === 'std_devs') params[paramInfo.name] = parseFloat(inputEl.value);
+                            else params[paramInfo.name] = inputEl.value;
+                        }
+                    });
+                }
+                strategiesForPayload.push({ id: strategyId, params: params });
+            }
+
+            const payload = {
+                asset_id: assetId,
+                asset_type: assetType,
+                initial_capital: initialCapital,
+                days: parseInt(days),
+                trade_quantity: tradeQuantity,
+                trade_style: tradeStyle,
+                combination_logic: finalCombinationLogic,
+                strategies: strategiesForPayload
+            };
+
+            loadingMsg.style.display = 'block';
+            resultsSummaryDiv.style.display = 'none';
+            chartContainerDiv.style.display = 'none';
+            tradesLogDiv.style.display = 'none';
+            if (backtestChartInstance) backtestChartInstance.destroy();
+
+            fetch('/api/backtest', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(response => response.json().then(data => ({ ok: response.ok, status: response.status, body: data })))
+            .then(res => {
+                loadingMsg.style.display = 'none';
+                if (res.ok) {
+                    resultsSummaryDiv.style.display = 'block';
+                    chartContainerDiv.style.display = 'block';
+                    tradesLogDiv.style.display = 'block';
+                    resultsSummaryDiv.innerHTML = `
+                        <h4>Backtest Summary:</h4>
+                        <p>Final Portfolio Value: $${parseFloat(res.body.final_capital).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+                        <p>Profit/Loss: $${parseFloat(res.body.profit_loss).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+                        <p>Profit/Loss %: ${parseFloat(res.body.profit_loss_percent).toFixed(2)}%</p>
+                    `;
+                    if (res.body.capital_over_time && res.body.capital_over_time.length > 0) {
+                        renderBacktestChart(res.body.capital_over_time);
+                    }
+                    let tradesHtml = '<h4>Trades Log:</h4><table><thead><tr><th>Timestamp</th><th>Type</th><th>Price</th><th>Quantity</th><th>Capital Rem.</th></tr></thead><tbody>';
+                    if (res.body.trades && res.body.trades.length > 0) {
+                        res.body.trades.forEach(trade => {
+                            tradesHtml += \`<tr>
+                                <td>\${new Date(trade.timestamp).toLocaleString()}</td>
+                                <td>\${trade.type}</td>
+                                <td>$\${parseFloat(trade.price).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                <td>\${parseFloat(trade.quantity).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 8})}</td>
+                                <td>$\${parseFloat(trade.capital_remaining).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                            </tr>\`;
+                        });
+                    } else { tradesHtml += '<tr><td colspan="5">No trades were executed.</td></tr>'; }
+                    tradesHtml += '</tbody></table>';
+                    tradesLogDiv.innerHTML = tradesHtml;
+                } else {
+                    resultsSummaryDiv.style.display = 'block';
+                    resultsSummaryDiv.innerHTML = \`<p style="color:red;">Error (\${res.status}): \${res.body.error || 'Backtest failed'}</p>\`;
                 }
             })
             .catch(error => {
-                console.error('Trade error:', error);
-                tradeMessageEl.textContent = 'Error: An unexpected error occurred. Check console.';
-                tradeMessageEl.style.color = 'red';
+                loadingMsg.style.display = 'none';
+                resultsSummaryDiv.style.display = 'block';
+                resultsSummaryDiv.innerHTML = \`<p style="color:red;">Error: An unexpected error occurred. \${error}</p>\`;
+                console.error('Backtest error:', error);
+            });
+        }
+
+        function renderBacktestChart(capitalData) {
+            const ctx = document.getElementById('backtestChart').getContext('2d');
+            if (backtestChartInstance) { backtestChartInstance.destroy(); }
+            const labels = capitalData.map(item => new Date(item[0]).toLocaleDateString());
+            const dataPoints = capitalData.map(item => parseFloat(item[1]));
+            backtestChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Portfolio Value (USD)', data: dataPoints, borderColor: 'rgb(54, 162, 235)',
+                        backgroundColor: 'rgba(54, 162, 235, 0.1)', fill: true, tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: true,
+                    scales: {
+                        x: { title: { display: true, text: 'Date' } },
+                        y: { title: { display: true, text: 'Portfolio Value (USD)' }, ticks: { callback: function(value) { return '$' + value.toLocaleString();}} }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) { label += ': '; }
+                                    if (context.parsed.y !== null) {
+                                        label += '$' + context.parsed.y.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
             });
         }
     </script>
 </body>
 </html>
+
+[end of crypto_dashboard/templates/index.html]
