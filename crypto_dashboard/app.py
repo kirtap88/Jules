@@ -9,7 +9,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from decimal import Decimal, ROUND_DOWN
 
 # Imports for strategies and backtesting
-from .strategies import moving_average_crossover_signal, rsi_signal, bollinger_bands_signal
+from .strategies import moving_average_crossover_signal, rsi_signal, bollinger_bands_signal, macd_signal, stochastic_oscillator_signal
 from .backtesting import run_backtest # run_backtest will now take trade_style
 from .stock_data_provider import get_stock_history, get_current_stock_price as get_current_stock_price_from_provider, search_stocks
 from .genetic_optimizer import run_ga_optimization # Import for GA
@@ -181,6 +181,23 @@ def api_list_strategies():
                 {"name": "period", "default": 20, "type": "int", "label": "Period"},
                 {"name": "std_devs", "default": 2, "type": "float", "label": "Standard Deviations"}
             ]
+        },
+        {
+            "id": "macd", "name": "MACD",
+            "params": [
+                {"name": "short_ema_period", "default": 12, "type": "int", "label": "Short EMA Period"},
+                {"name": "long_ema_period", "default": 26, "type": "int", "label": "Long EMA Period"},
+                {"name": "signal_period", "default": 9, "type": "int", "label": "Signal Period"}
+            ]
+        },
+        {
+            "id": "stochastic_oscillator", "name": "Stochastic Oscillator",
+            "params": [
+                {"name": "k_period", "default": 14, "type": "int", "label": "K Period"},
+                {"name": "d_period", "default": 3, "type": "int", "label": "D Period (SMA of %K)"},
+                {"name": "oversold_level", "default": 20, "type": "int", "label": "Oversold Level"},
+                {"name": "overbought_level", "default": 80, "type": "int", "label": "Overbought Level"}
+            ]
         }
     ]
     return jsonify(strategies)
@@ -227,6 +244,34 @@ def _parse_and_validate_strategy_params(strategy_id: str, raw_params: dict) -> d
         std_devs = _get_typed_param(raw_params, "std_devs", "number", float, lambda x: x > 0, "Bollinger Bands std_devs must be positive.")
         if period is not None: validated_params["period"] = period
         if std_devs is not None: validated_params["std_devs"] = std_devs
+    elif strategy_id == "macd":
+        short_ema_period = _get_typed_param(raw_params, "short_ema_period", "integer", int, lambda x: x > 0, "MACD Short EMA period must be positive.")
+        long_ema_period = _get_typed_param(raw_params, "long_ema_period", "integer", int, lambda x: x > 0, "MACD Long EMA period must be positive.")
+        signal_period = _get_typed_param(raw_params, "signal_period", "integer", int, lambda x: x > 0, "MACD Signal period must be positive.")
+
+        if short_ema_period is not None: validated_params["short_ema_period"] = short_ema_period
+        if long_ema_period is not None: validated_params["long_ema_period"] = long_ema_period
+        if signal_period is not None: validated_params["signal_period"] = signal_period
+
+        if validated_params.get("short_ema_period") is not None and \
+           validated_params.get("long_ema_period") is not None and \
+           validated_params["short_ema_period"] >= validated_params["long_ema_period"]:
+            raise ValueError("MACD: Short EMA period must be less than Long EMA period.")
+    elif strategy_id == "stochastic_oscillator":
+        k_period = _get_typed_param(raw_params, "k_period", "integer", int, lambda x: x > 0, "Stochastic K period must be positive.")
+        d_period = _get_typed_param(raw_params, "d_period", "integer", int, lambda x: x > 0, "Stochastic D period must be positive.")
+        oversold_level = _get_typed_param(raw_params, "oversold_level", "integer", int, lambda x: 0 <= x <= 100, "Stochastic Oversold level must be between 0 and 100.")
+        overbought_level = _get_typed_param(raw_params, "overbought_level", "integer", int, lambda x: 0 <= x <= 100, "Stochastic Overbought level must be between 0 and 100.")
+
+        if k_period is not None: validated_params["k_period"] = k_period
+        if d_period is not None: validated_params["d_period"] = d_period
+        if oversold_level is not None: validated_params["oversold_level"] = oversold_level
+        if overbought_level is not None: validated_params["overbought_level"] = overbought_level
+
+        if validated_params.get("oversold_level") is not None and \
+           validated_params.get("overbought_level") is not None and \
+           validated_params["oversold_level"] >= validated_params["overbought_level"]:
+            raise ValueError("Stochastic: Oversold level must be less than Overbought level.")
     else:
         raise ValueError(f"Parameter parsing not implemented for unknown strategy: {strategy_id}")
     return validated_params
@@ -241,7 +286,9 @@ def api_run_backtest():
     initial_capital_str = data.get('initial_capital')
     days_str = data.get('days')
     trade_quantity_str = data.get('trade_quantity', "1.0")
-    trade_style = data.get('trade_style', "default") # New field
+    trade_style = data.get('trade_style', "default")
+    stop_loss_str = data.get('stop_loss_percent')
+    take_profit_str = data.get('take_profit_percent')
 
     combination_logic_req = data.get("combination_logic")
     strategy_payloads = data.get("strategies")
@@ -267,7 +314,7 @@ def api_run_backtest():
         actual_combination_logic = combination_logic_req.upper()
 
     # Validate trade_style (allow case-insensitivity for robustness)
-    valid_trade_styles = ["default", "day_trader", "swing_trader", "long_term_investor"]
+    valid_trade_styles = ["default", "day_trader", "swing_trader", "long_term_investor"] # Already includes them
     trade_style_to_pass = trade_style.lower() if trade_style else "default"
     if trade_style_to_pass not in valid_trade_styles:
         return jsonify({"error": f"Invalid trade_style: {trade_style}. Must be one of {valid_trade_styles}."}), 400
@@ -279,8 +326,19 @@ def api_run_backtest():
         if days <= 0: raise ValueError("Days must be a positive integer.")
         trade_quantity = Decimal(str(trade_quantity_str))
         if trade_quantity <= Decimal('0'): raise ValueError("Trade quantity must be positive.")
+
+        stop_loss = None
+        if stop_loss_str is not None and stop_loss_str.strip() != "":
+            stop_loss = Decimal(stop_loss_str)
+            if stop_loss <= Decimal('0'): raise ValueError("Stop-loss percent must be positive.")
+
+        take_profit = None
+        if take_profit_str is not None and take_profit_str.strip() != "":
+            take_profit = Decimal(take_profit_str)
+            if take_profit <= Decimal('0'): raise ValueError("Take-profit percent must be positive.")
+
     except ValueError as e: return jsonify({"error": str(e)}), 400
-    except Exception as e: return jsonify({"error": f"Invalid input for capital, days, or quantity: {e}"}), 400
+    except Exception as e: return jsonify({"error": f"Invalid input for capital, days, quantity, SL/TP: {e}"}), 400
 
     historical_data_points = None
     if asset_type == 'stock':
@@ -298,7 +356,9 @@ def api_run_backtest():
     strategy_function_map = {
         "moving_average_crossover": moving_average_crossover_signal,
         "rsi": rsi_signal,
-        "bollinger_bands": bollinger_bands_signal
+        "bollinger_bands": bollinger_bands_signal,
+        "macd": macd_signal,
+        "stochastic_oscillator": stochastic_oscillator_signal
     }
     try:
         for i, strat_payload in enumerate(strategy_payloads):
@@ -321,7 +381,9 @@ def api_run_backtest():
             historical_data=historical_data_points,
             initial_capital=initial_capital,
             trade_quantity=trade_quantity,
-            trade_style=trade_style_to_pass
+            trade_style=trade_style_to_pass,
+            stop_loss_percent=stop_loss,
+            take_profit_percent=take_profit
         )
     except Exception as e:
         app.logger.error(f"Error during run_backtest: {e}", exc_info=True)

@@ -118,9 +118,17 @@
             <select id="trade-style">
                 <option value="default" selected>Default</option>
                 <option value="day_trader">Day Trader</option>
-                <!-- <option value="swing_trader">Swing Trader</option> -->
-                <!-- <option value="long_term_investor">Long Term Investor</option> -->
+                <option value="swing_trader">Swing Trader</option>
+                <option value="long_term_investor">Long Term Investor</option>
             </select>
+
+            <label for="backtest-stop-loss">Stop-Loss % (e.g., 5 for 5%):</label>
+            <input type="number" id="backtest-stop-loss" placeholder="e.g., 5" step="0.1">
+            <label for="backtest-take-profit">Take-Profit % (e.g., 10 for 10%):</label>
+            <input type="number" id="backtest-take-profit" placeholder="e.g., 10" step="0.1">
+
+            <label for="backtest-transaction-fee">Transaction Fee % (e.g., 0.1 for 0.1%):</label>
+            <input type="number" id="backtest-transaction-fee" placeholder="e.g., 0.1" step="0.01">
 
             <button id="run-backtest-btn">Run Backtest</button>
             <div id="backtest-loading-message" style="display:none;">Loading backtest results...</div>
@@ -134,10 +142,10 @@
     </div>
 
     <script>
-        let priceChartInstance = null;
+        let priceChartInstance = null; // This is the main price chart instance
         let selectedAsset = { id: null, name: null, symbol: null, asset_type: 'crypto', exchange: null };
         let baseStrategiesData = {};
-        let backtestChartInstance = null;
+        let backtestChartInstance = null; // This is for the portfolio value chart from backtesting
         let strategyRowCount = 0;
 
         document.addEventListener('DOMContentLoaded', function() {
@@ -385,7 +393,10 @@
             const days = document.getElementById('backtest-days-history').value;
             const tradeQuantity = document.getElementById('backtest-trade-quantity').value;
             const combinationLogic = document.getElementById('combination-logic').value || null;
-            const tradeStyle = document.getElementById('trade-style').value; // Get selected trade style
+            const tradeStyle = document.getElementById('trade-style').value;
+            const stopLossPercent = document.getElementById('backtest-stop-loss').value;
+            const takeProfitPercent = document.getElementById('backtest-take-profit').value;
+            const transactionFeePercent = document.getElementById('backtest-transaction-fee').value;
 
             const loadingMsg = document.getElementById('backtest-loading-message');
             const resultsSummaryDiv = document.getElementById('backtest-results-summary');
@@ -450,6 +461,16 @@
                 strategies: strategiesForPayload
             };
 
+            if (stopLossPercent && stopLossPercent.trim() !== "") {
+                payload.stop_loss_percent = parseFloat(stopLossPercent);
+            }
+            if (takeProfitPercent && takeProfitPercent.trim() !== "") {
+                payload.take_profit_percent = parseFloat(takeProfitPercent);
+            }
+            if (transactionFeePercent && transactionFeePercent.trim() !== "") {
+                payload.transaction_fee_percent = parseFloat(transactionFeePercent);
+            }
+
             loadingMsg.style.display = 'block';
             resultsSummaryDiv.style.display = 'none';
             chartContainerDiv.style.display = 'none';
@@ -473,22 +494,54 @@
                         <p>Final Portfolio Value: $${parseFloat(res.body.final_capital).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
                         <p>Profit/Loss: $${parseFloat(res.body.profit_loss).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
                         <p>Profit/Loss %: ${parseFloat(res.body.profit_loss_percent).toFixed(2)}%</p>
+                        <p>Max Drawdown: <span id="backtest-max-drawdown">N/A</span>%</p>
+                        <hr>
+                        <p>Total Round Trips: <span id="backtest-total-round-trips">N/A</span></p>
+                        <p>Winning Trades: <span id="backtest-winning-trades">N/A</span></p>
+                        <p>Losing Trades: <span id="backtest-losing-trades">N/A</span></p>
+                        <p>Breakeven Trades: <span id="backtest-breakeven-trades">N/A</span></p>
+                        <p>Win Rate: <span id="backtest-win-rate">N/A</span>%</p>
+                        <p>Avg Profit/Winning Trade: $<span id="backtest-avg-profit">N/A</span></p>
+                        <p>Avg Loss/Losing Trade: $<span id="backtest-avg-loss">N/A</span></p>
+                        <p>Profit Factor: <span id="backtest-profit-factor">N/A</span></p>
                     `;
+                    // Populate new metrics
+                    document.getElementById('backtest-max-drawdown').textContent = parseFloat(res.body.max_drawdown_percent).toFixed(2);
+                    document.getElementById('backtest-total-round-trips').textContent = res.body.total_round_trip_trades;
+                    document.getElementById('backtest-winning-trades').textContent = res.body.winning_trades;
+                    document.getElementById('backtest-losing-trades').textContent = res.body.losing_trades;
+                    document.getElementById('backtest-breakeven-trades').textContent = res.body.breakeven_trades;
+                    document.getElementById('backtest-win-rate').textContent = parseFloat(res.body.win_rate_percent).toFixed(2);
+                    document.getElementById('backtest-avg-profit').textContent = parseFloat(res.body.average_profit_per_winning_trade).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                    document.getElementById('backtest-avg-loss').textContent = parseFloat(res.body.average_loss_per_losing_trade).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                    document.getElementById('backtest-profit-factor').textContent = (typeof res.body.profit_factor === 'number' ? parseFloat(res.body.profit_factor).toFixed(2) : res.body.profit_factor);
+
                     if (res.body.capital_over_time && res.body.capital_over_time.length > 0) {
                         renderBacktestChart(res.body.capital_over_time);
                     }
-                    let tradesHtml = '<h4>Trades Log:</h4><table><thead><tr><th>Timestamp</th><th>Type</th><th>Price</th><th>Quantity</th><th>Capital Rem.</th></tr></thead><tbody>';
+                    let tradesHtml = '<h4>Trades Log:</h4><table><thead><tr><th>Timestamp</th><th>Type</th><th>Price</th><th>Quantity</th><th>Fee Paid</th><th>Capital Rem.</th></tr></thead><tbody>';
                     if (res.body.trades && res.body.trades.length > 0) {
                         res.body.trades.forEach(trade => {
                             tradesHtml += \`<tr>
                                 <td>\${new Date(trade.timestamp).toLocaleString()}</td>
                                 <td>\${trade.type}</td>
-                                <td>$\${parseFloat(trade.price).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                <td>$\${parseFloat(trade.price_at_trade || trade.price).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                                 <td>\${parseFloat(trade.quantity).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 8})}</td>
+                                <td>$\${parseFloat(trade.fee_paid || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 4})}</td>
                                 <td>$\${parseFloat(trade.capital_remaining).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                             </tr>\`;
                         });
-                    } else { tradesHtml += '<tr><td colspan="5">No trades were executed.</td></tr>'; }
+                        // After successful backtest, display trade markers on the main price chart
+                        if (priceChartInstance && selectedAsset.id === payload.asset_id) { // payload.asset_id is from the backtest request
+                            displayTradeMarkersOnPriceChart(res.body.trades, priceChartInstance);
+                        }
+                    } else {
+                        tradesHtml += '<tr><td colspan="5">No trades were executed.</td></tr>';
+                        // If no trades, still clear any old markers from price chart if it's the same asset
+                        if (priceChartInstance && selectedAsset.id === payload.asset_id) {
+                             displayTradeMarkersOnPriceChart([], priceChartInstance); // Call with empty trades to clear
+                        }
+                    }
                     tradesHtml += '</tbody></table>';
                     tradesLogDiv.innerHTML = tradesHtml;
                 } else {
@@ -541,7 +594,73 @@
                 }
             });
         }
+
+        function displayTradeMarkersOnPriceChart(trades, chartInstance) {
+            if (!chartInstance || !chartInstance.data) {
+                console.warn("displayTradeMarkersOnPriceChart: Chart instance or its data is not available.");
+                return;
+            }
+
+            // Remove any existing marker datasets by their labels
+            const labelsToRemove = ['Buy Markers', 'Sell Markers'];
+            chartInstance.data.datasets = chartInstance.data.datasets.filter(dataset =>
+                !labelsToRemove.includes(dataset.label)
+            );
+
+            const buyMarkerData = [];
+            const sellMarkerData = [];
+
+            trades.forEach(trade => {
+                // Ensure price_at_trade exists and is a number, fallback to price if needed (older structures)
+                const price = parseFloat(trade.price_at_trade || trade.price);
+                if (isNaN(price)) {
+                    console.warn("Skipping trade marker due to invalid price:", trade);
+                    return;
+                }
+                const point = {
+                    x: trade.timestamp, // Assuming timestamp is epoch ms
+                    y: price
+                };
+                if (trade.type === 'buy') {
+                    buyMarkerData.push(point);
+                } else if (trade.type === 'sell') {
+                    sellMarkerData.push(point);
+                }
+            });
+
+            if (buyMarkerData.length > 0) {
+                chartInstance.data.datasets.push({
+                    type: 'scatter',
+                    label: 'Buy Markers',
+                    data: buyMarkerData,
+                    backgroundColor: 'rgba(0, 180, 0, 0.7)', // Darker Green
+                    borderColor: 'rgba(0, 128, 0, 1)',
+                    pointStyle: 'triangle',
+                    rotation: 0, // Pointing up
+                    radius: 7, // Slightly smaller
+                    hoverRadius: 10,
+                    order: -1 // Render on top (lower order means drawn later, hence on top)
+                });
+            }
+
+            if (sellMarkerData.length > 0) {
+                chartInstance.data.datasets.push({
+                    type: 'scatter',
+                    label: 'Sell Markers',
+                    data: sellMarkerData,
+                    backgroundColor: 'rgba(255, 0, 0, 0.7)', // Red
+                    borderColor: 'rgba(200, 0, 0, 1)',
+                    pointStyle: 'triangle',
+                    rotation: 180, // Pointing down
+                    radius: 7,
+                    hoverRadius: 10,
+                    order: -1 // Render on top
+                });
+            }
+            chartInstance.update();
+        }
     </script>
+<!-- AI_AGENT_TEST_MOD_20231027_120000 -->
 </body>
 </html>
 

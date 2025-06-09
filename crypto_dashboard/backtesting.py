@@ -3,6 +3,11 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Constants for trading styles
+SWING_MIN_HOLD_PERIOD = 3  # days
+LONG_TERM_IGNORE_SIGNALS_PERIOD = 20 # days
+
+
 def _get_combined_signal(signals: list, logic: str) -> str:
     """
     Combines multiple trading signals based on a specified logic.
@@ -51,7 +56,10 @@ def _get_combined_signal(signals: list, logic: str) -> str:
         return 'hold'
 
 
-def run_backtest(strategy_config, historical_data, initial_capital, trade_quantity=Decimal('1.0'), trade_style: str = "default"):
+def run_backtest(strategy_config, historical_data, initial_capital,
+                 trade_quantity=Decimal('1.0'), trade_style: str = "default",
+                 stop_loss_percent: Decimal | None = None,
+                 take_profit_percent: Decimal | None = None):
     """
     Runs a backtest for a given trading strategy or a combination of strategies,
     incorporating a trading style.
@@ -92,6 +100,8 @@ def run_backtest(strategy_config, historical_data, initial_capital, trade_quanti
     capital = Decimal(initial_capital)
     asset_held = Decimal('0')
     trades_log = []
+    last_buy_day_index = None # For swing/long-term style holding period tracking
+    entry_price_for_sl_tp = None # For current holding's entry price for SL/TP checks
 
     first_timestamp = historical_data[0][0] if historical_data else 0
     capital_over_time_log = [[first_timestamp, initial_capital]]
@@ -125,48 +135,93 @@ def run_backtest(strategy_config, historical_data, initial_capital, trade_quanti
         elif len(individual_signals) > 1 :
             base_final_signal = _get_combined_signal(individual_signals, strategy_config["logic"])
 
-        # --- Apply Trade Style Modifications ---
-        final_signal_for_action = base_final_signal
+        # --- Initialize action signal ---
+        current_action_signal = base_final_signal
+        sl_tp_triggered_sell = False
 
-        # "day_trader": If holding an asset, force sell at the current period's price if not the last day.
-        # This simulates selling at market close of the current day `i`.
-        if trade_style == "day_trader" and asset_held > Decimal('0') and i < len(historical_data) - 1:
-            if base_final_signal != 'sell':
-                logger.info(f"Trade Style 'day_trader': Overriding signal to 'sell' for day {i} (ts {current_timestamp}) as asset is held.")
-            final_signal_for_action = 'sell'
+        # --- Check Stop-Loss / Take-Profit if a position is open ---
+        if entry_price_for_sl_tp is not None and asset_held > Decimal('0'):
+            current_potential_profit_percent = ((current_price - entry_price_for_sl_tp) / entry_price_for_sl_tp) * Decimal('100')
 
-        # --- Future trade style logic examples (not fully implemented here) ---
-        # if trade_style == "swing_trader":
-        #     # Example: Prevent buying more if already holding (anti-pyramiding)
-        #     if base_final_signal == 'buy' and asset_held > Decimal('0'):
-        #         logger.info(f"Trade Style 'swing_trader': Holding current position, buy signal for {current_timestamp} ignored.")
-        #         final_signal_for_action = 'hold'
-        #
-        # if trade_style == "long_term_investor":
-        #     # Example: Ignore sell signals unless it's a very strong one (e.g. from a specific risk strategy not implemented here)
-        #     if base_final_signal == 'sell':
-        #         logger.info(f"Trade Style 'long_term_investor': Sell signal for {current_timestamp} ignored.")
-        #         final_signal_for_action = 'hold'
+            if stop_loss_percent is not None and current_potential_profit_percent <= -abs(stop_loss_percent):
+                logger.info(f"Stop-Loss triggered on day {i} at price {current_price}. Profit %: {current_potential_profit_percent:.2f}%")
+                current_action_signal = 'sell'
+                sl_tp_triggered_sell = True
+            elif take_profit_percent is not None and current_potential_profit_percent >= abs(take_profit_percent):
+                logger.info(f"Take-Profit triggered on day {i} at price {current_price}. Profit %: {current_potential_profit_percent:.2f}%")
+                current_action_signal = 'sell'
+                sl_tp_triggered_sell = True
 
+        # --- Apply Trading Style Modifications (if SL/TP didn't trigger a sell) ---
+        if not sl_tp_triggered_sell:
+            if trade_style == "swing_trader":
+                if current_action_signal == 'buy':
+                    if last_buy_day_index is not None: # Currently holding (based on style logic)
+                        logger.info(f"Swing Trader: Holding asset, ignoring buy signal on day {i}.")
+                        current_action_signal = 'hold'
+                elif current_action_signal == 'sell':
+                    if last_buy_day_index is not None and (i - last_buy_day_index) < SWING_MIN_HOLD_PERIOD:
+                        logger.info(f"Swing Trader: In min hold period ({SWING_MIN_HOLD_PERIOD} days), ignoring sell signal on day {i}.")
+                        current_action_signal = 'hold'
 
-        # Simulate trade based on the final_signal_for_action
-        if final_signal_for_action == 'buy' and capital > Decimal('0'):
+            elif trade_style == "long_term_investor":
+                if last_buy_day_index is not None and (i - last_buy_day_index) < LONG_TERM_IGNORE_SIGNALS_PERIOD:
+                    if current_action_signal != 'hold': # Log only if it's overriding something
+                        logger.info(f"Long Term Investor: In initial holding period ({LONG_TERM_IGNORE_SIGNALS_PERIOD} days), overriding '{current_action_signal}' signal to 'hold' on day {i}.")
+                    current_action_signal = 'hold'
+
+            # "Day Trader" logic is a final override for EOD action if still holding *and* SL/TP didn't already trigger a sell.
+            if trade_style == "day_trader" and asset_held > Decimal('0') and i < len(historical_data) - 1:
+                if current_action_signal != 'sell':
+                    logger.info(f"Day Trader: Overriding signal to 'sell' on day {i} as asset is held EOD.")
+                current_action_signal = 'sell'
+
+        # --- Simulate trade based on the final_signal_for_action (now current_action_signal) ---
+        if current_action_signal == 'buy' and capital > Decimal('0'):
             cost = trade_quantity * current_price
             if capital >= cost:
+                # If already holding, this buy adds to position. SL/TP entry price might need averaging if pyramiding.
+                # Current logic: fixed trade_quantity for buy, sell all. So, this buy is effectively a new position if asset_held was 0.
+                if asset_held == Decimal('0'): # New position initiated by this buy
+                    entry_price_for_sl_tp = current_price
+                # If pyramiding was allowed, entry_price_for_sl_tp would need to be an average.
+                # For now, if asset_held > 0 and another buy happens (not blocked by swing trader), we keep the original entry_price_for_sl_tp.
+                # This means SL/TP is based on the first entry of the current continuous holding.
+
                 asset_held += trade_quantity
                 capital -= cost
                 trades_log.append({
                     "timestamp": current_timestamp, "type": "buy", "price": current_price,
-                    "quantity": trade_quantity, "capital_remaining": capital
+                    "quantity": trade_quantity, "capital_remaining": capital, "signal_source": "strategy" if not sl_tp_triggered_sell else "risk_mgmt"
                 })
-        elif final_signal_for_action == 'sell' and asset_held > Decimal('0'):
-            proceeds = asset_held * current_price
+                if trade_style in ["swing_trader", "long_term_investor"] and not sl_tp_triggered_sell : # only update if not SL/TP sell
+                    if asset_held == trade_quantity: # Assuming this buy started the holding for style tracking
+                         last_buy_day_index = i
+
+        elif current_action_signal == 'sell' and asset_held > Decimal('0'):
+            proceeds = asset_held * current_price # Sells all currently held quantity
+            sold_quantity = asset_held
             capital += proceeds
+
+            source_of_signal = "strategy"
+            if sl_tp_triggered_sell:
+                source_of_signal = "risk_mgmt"
+            elif trade_style == "day_trader" and i < len(historical_data) - 1 : # Check if day trader forced this sell
+                 # This check needs to be more precise: was it strategy or day_trader?
+                 # If sl_tp_triggered_sell is false, and current_action_signal is 'sell', and day_trader conditions met, then it's day_trader.
+                 # The current_action_signal already reflects this.
+                 if base_final_signal != 'sell' and (trade_style == "day_trader" and i < len(historical_data) -1): # if base was not sell, but day trader made it sell
+                      source_of_signal = "day_trader_style"
+
+
             trades_log.append({
                 "timestamp": current_timestamp, "type": "sell", "price": current_price,
-                "quantity": asset_held, "capital_remaining": capital
+                "quantity": sold_quantity, "capital_remaining": capital, "signal_source": source_of_signal
             })
             asset_held = Decimal('0')
+            entry_price_for_sl_tp = None # Position closed
+            if trade_style in ["swing_trader", "long_term_investor"]:
+                last_buy_day_index = None # Asset sold for style tracking
 
         current_portfolio_value = capital + (asset_held * current_price)
         capital_over_time_log.append([current_timestamp, current_portfolio_value])
@@ -175,13 +230,92 @@ def run_backtest(strategy_config, historical_data, initial_capital, trade_quanti
     profit_loss = final_portfolio_value - initial_capital
     profit_loss_percent = (profit_loss / initial_capital) * Decimal('100') if initial_capital > Decimal('0') else Decimal('0')
 
-    return {
+    # --- Advanced Metrics Calculation ---
+    completed_round_trips = []
+    open_positions_for_metrics = []
+
+    for trade in trades_log: # trades_log contains dicts with 'type', 'price', 'quantity'
+        if trade['type'] == 'buy':
+            open_positions_for_metrics.append({'price': trade['price'], 'quantity': trade['quantity']})
+        elif trade['type'] == 'sell' and open_positions_for_metrics:
+            sell_price = trade['price']
+            sell_quantity_to_account = trade['quantity'] # Total quantity of this sell trade
+
+            # Match this sell against open buy positions (FIFO)
+            while sell_quantity_to_account > Decimal('0') and open_positions_for_metrics:
+                oldest_buy = open_positions_for_metrics[0]
+
+                # Determine quantity for this specific round trip leg
+                quantity_this_leg = min(sell_quantity_to_account, oldest_buy['quantity'])
+
+                pnl_this_leg = (sell_price - oldest_buy['price']) * quantity_this_leg
+                completed_round_trips.append({
+                    "entry_price": oldest_buy['price'],
+                    "exit_price": sell_price,
+                    "quantity": quantity_this_leg,
+                    "pnl": pnl_this_leg
+                })
+
+                oldest_buy['quantity'] -= quantity_this_leg
+                sell_quantity_to_account -= quantity_this_leg
+
+                if oldest_buy['quantity'] <= Decimal('0'):
+                    open_positions_for_metrics.pop(0) # This buy position is fully closed
+
+    total_round_trip_trades = len(completed_round_trips)
+    winning_trades = sum(1 for rt in completed_round_trips if rt['pnl'] > Decimal('0'))
+    losing_trades = sum(1 for rt in completed_round_trips if rt['pnl'] < Decimal('0'))
+    breakeven_trades = total_round_trip_trades - winning_trades - losing_trades
+
+    total_profit_from_wins = sum(rt['pnl'] for rt in completed_round_trips if rt['pnl'] > Decimal('0'))
+    total_loss_from_losses = sum(abs(rt['pnl']) for rt in completed_round_trips if rt['pnl'] < Decimal('0'))
+
+    win_rate_percent = (Decimal(winning_trades) / Decimal(total_round_trip_trades)) * Decimal('100') if total_round_trip_trades > 0 else Decimal('0')
+
+    average_profit_per_winning_trade = total_profit_from_wins / Decimal(winning_trades) if winning_trades > 0 else Decimal('0')
+    average_loss_per_losing_trade = total_loss_from_losses / Decimal(losing_trades) if losing_trades > 0 else Decimal('0')
+
+    profit_factor_val = "N/A"
+    if total_loss_from_losses > Decimal('0'):
+        profit_factor_val = total_profit_from_wins / total_loss_from_losses
+    elif total_profit_from_wins > Decimal('0'): # No losses, but profits exist
+        profit_factor_val = Decimal('inf')
+
+    # Max Drawdown Calculation
+    max_drawdown_percent = Decimal('0')
+    peak_capital_so_far = initial_capital
+    if capital_over_time_log: # Ensure log is not empty
+        peak_capital_so_far = capital_over_time_log[0][1] # Start with the first logged capital value
+
+    for _, capital_value in capital_over_time_log:
+        current_capital_val = Decimal(str(capital_value)) # Ensure it's Decimal
+        if current_capital_val > peak_capital_so_far:
+            peak_capital_so_far = current_capital_val
+
+        if peak_capital_so_far > Decimal('0'):
+            drawdown = (peak_capital_so_far - current_capital_val) / peak_capital_so_far
+            if drawdown > max_drawdown_percent:
+                max_drawdown_percent = drawdown
+    max_drawdown_percent *= Decimal('100')
+
+    results = {
         "final_capital": final_portfolio_value,
         "profit_loss": profit_loss,
         "profit_loss_percent": profit_loss_percent.quantize(Decimal('0.01')),
         "trades": trades_log,
-        "capital_over_time": capital_over_time_log
+        "capital_over_time": capital_over_time_log,
+
+        "total_round_trip_trades": total_round_trip_trades,
+        "winning_trades": winning_trades,
+        "losing_trades": losing_trades,
+        "breakeven_trades": breakeven_trades,
+        "win_rate_percent": win_rate_percent.quantize(Decimal('0.01')),
+        "average_profit_per_winning_trade": average_profit_per_winning_trade.quantize(Decimal('0.01')),
+        "average_loss_per_losing_trade": average_loss_per_losing_trade.quantize(Decimal('0.01')),
+        "profit_factor": float(profit_factor_val) if isinstance(profit_factor_val, Decimal) and profit_factor_val != Decimal('inf') else str(profit_factor_val),
+        "max_drawdown_percent": max_drawdown_percent.quantize(Decimal('0.01')),
     }
+    return results
 
 if __name__ == '__main__':
     # Example Usage (conceptual, requires actual strategy functions to be imported)

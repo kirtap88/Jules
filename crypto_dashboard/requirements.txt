@@ -14,4 +14,5 @@ Alembic>=1.9.0 # For Flask-Migrate
 Mako # For Alembic templates
 greenlet>=1.0 # For SQLAlchemy async (though not directly used, often a dep)
 numpy # Added for strategies.py
+pandas # Added for MACD strategy
 yfinance # For fetching stock data from Yahoo Finance

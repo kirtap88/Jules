@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 
 def moving_average_crossover_signal(historical_data, short_window=10, long_window=30):
     """
@@ -261,6 +262,127 @@ def bollinger_bands_signal(historical_data, period=20, std_devs=2):
     return 'hold'
 
 
+def stochastic_oscillator_signal(historical_data, k_period=14, d_period=3, oversold_level=20, overbought_level=80):
+    """
+    Generates a trading signal based on the Stochastic Oscillator.
+    Uses closing prices if high/low are not available.
+
+    Args:
+        historical_data (list): List of [timestamp, price] or [timestamp, high, low, close] data points.
+                                If HLC are not present, uses close price for all calculations.
+        k_period (int): The period for %K calculation (lookback for high/low).
+        d_period (int): The period for %D (SMA of %K).
+        oversold_level (int): The RSI level considered oversold.
+        overbought_level (int): The RSI level considered overbought.
+
+    Returns:
+        str or None: 'buy', 'sell', 'hold', or None if data is insufficient.
+    """
+    if not historical_data:
+        return None
+
+    if not (isinstance(k_period, int) and k_period > 0 and
+            isinstance(d_period, int) and d_period > 0 and
+            isinstance(oversold_level, (int, float)) and 0 <= oversold_level <= 100 and
+            isinstance(overbought_level, (int, float)) and 0 <= overbought_level <= 100):
+        # logger.warning("Stochastic: Invalid parameters.")
+        return None
+
+    if oversold_level >= overbought_level:
+        # logger.warning("Stochastic: Oversold level must be less than overbought level.")
+        return None
+
+    # Adapt data: use close for H/L if only close is available
+    # Assuming historical_data is list of [ts, close] or [ts, open, high, low, close]
+    # For simplicity with current data provider, we primarily expect [ts, close]
+    # If data point is a list: item[1] is close for [ts, close]
+    # If data point is a dict: item['close'], item['high'], item['low']
+
+    closes = []
+    highs = []
+    lows = []
+
+    if isinstance(historical_data[0], dict):
+        closes = pd.Series([item['close'] for item in historical_data], dtype=float)
+        highs = pd.Series([item.get('high', item['close']) for item in historical_data], dtype=float) # Fallback to close
+        lows = pd.Series([item.get('low', item['close']) for item in historical_data], dtype=float)   # Fallback to close
+    elif isinstance(historical_data[0], list) and len(historical_data[0]) == 2: # [ts, close]
+        closes = pd.Series([item[1] for item in historical_data], dtype=float)
+        highs = closes # Use close for high
+        lows = closes  # Use close for low
+    elif isinstance(historical_data[0], list) and len(historical_data[0]) >= 4: # [ts, o, h, l, c] or similar
+        # Assuming a common structure like [ts, open, high, low, close]
+        # This needs to be robust if data format varies. For now, let's assume index 2 is high, 3 is low, 4 is close
+        # This part is fragile if data format isn't guaranteed.
+        # For this implementation, we'll stick to the "close-only" simplification based on current data sources.
+        closes = pd.Series([item[1] for item in historical_data], dtype=float) # Assuming item[1] is close for now
+        highs = closes
+        lows = closes
+    else:
+        # logger.warning("Stochastic: Unknown historical_data format.")
+        return None
+
+
+    # Minimum data points needed: k_period for first %K, then d_period for first %D.
+    # To check crossover, need two %K and two %D. So, k_period + d_period.
+    min_data_len = k_period + d_period
+    if len(closes) < min_data_len:
+        # logger.info(f"Stochastic: Insufficient data. Have {len(closes)}, need {min_data_len}")
+        return None
+
+    # Calculate Lowest Low and Highest High over the k_period
+    lowest_low_k = lows.rolling(window=k_period, min_periods=k_period).min()
+    highest_high_k = highs.rolling(window=k_period, min_periods=k_period).max()
+
+    # Calculate %K
+    # %K = 100 * (Current Close - Lowest Low) / (Highest High - Lowest Low)
+    # Handle division by zero if Highest High == Lowest Low
+    percent_k = ((closes - lowest_low_k) / (highest_high_k - lowest_low_k).replace(0, np.nan)) * 100
+    percent_k = percent_k.fillna(50) # Or some other neutral value if denominator was zero
+
+    # Calculate %D (Signal Line - SMA of %K)
+    percent_d = percent_k.rolling(window=d_period, min_periods=d_period).mean()
+
+    # Drop NaNs from the start of the series
+    percent_k_valid = percent_k.dropna()
+    percent_d_valid = percent_d.dropna()
+
+    if len(percent_k_valid) < 2 or len(percent_d_valid) < 2:
+        return 'hold'
+
+    # Align series by taking common valid indices
+    valid_indices = percent_k_valid.index.intersection(percent_d_valid.index)
+    if len(valid_indices) < 2:
+        return 'hold'
+
+    k_current = percent_k[valid_indices[-1]]
+    k_previous = percent_k[valid_indices[-2]]
+    d_current = percent_d[valid_indices[-1]]
+    d_previous = percent_d[valid_indices[-2]]
+
+    # Buy signal: %K crosses above %D AND %K (or %D) is below oversold_level
+    if k_previous < d_previous and k_current > d_current:
+        if k_current < oversold_level or d_current < oversold_level: # Moving out of oversold
+             return 'buy'
+        # Alternative: if k_previous < oversold_level and k_current > oversold_level (crossing up out of oversold)
+        # The prompt's version: "%K crosses above %D AND %K (or %D) is below oversold_level" -- means it can still be in oversold, or just crossed into it.
+        # A more common interpretation for buy is %K crossing *up* through oversold_level, or %K crossing *up* through %D *while in oversold territory*.
+        # Let's use: %K crosses above %D, and the crossover happened in oversold region or %K is now moving out.
+        # For simplicity: K crosses D, and K is currently below oversold (meaning it's just exited or still deep)
+        # This is a bit ambiguous. Let's use "K crosses D, AND K is below oversold_level (or D is)".
+        # The prompt is: "K crosses above D AND K (or D) is below oversold_level".
+        # This means the crossover itself can happen anywhere, as long as one of them is in oversold.
+        # A more typical buy: k_previous < d_previous and k_current > d_current and (k_current < oversold_level or d_current < oversold_level)
+        # Or, K was oversold and crosses D: k_previous < d_previous and k_current > d_current and k_previous < oversold_level
+
+    # Sell signal: %K crosses below %D AND %K (or %D) is above overbought_level
+    elif k_previous > d_previous and k_current < d_current:
+        if k_current > overbought_level or d_current > overbought_level: # Moving out of overbought
+            return 'sell'
+
+    return 'hold'
+
+
 if __name__ == '__main__':
     # Example Usage for demonstration and basic testing:
     # This block will not be executed when the function is imported elsewhere.
@@ -346,3 +468,91 @@ if __name__ == '__main__':
     print(f"Data: Empty. Expected: None. Actual: {moving_average_crossover_signal([], 2, 4)}")
 
     print("--- End of Examples ---")
+
+
+def macd_signal(historical_data, short_ema_period=12, long_ema_period=26, signal_period=9):
+    """
+    Generates a trading signal based on the Moving Average Convergence Divergence (MACD).
+
+    Args:
+        historical_data (list): List of [timestamp, price] data points.
+        short_ema_period (int): Period for the short-term EMA.
+        long_ema_period (int): Period for the long-term EMA.
+        signal_period (int): Period for the signal line EMA.
+
+    Returns:
+        str or None: 'buy', 'sell', 'hold', or None if data is insufficient.
+    """
+    if not historical_data:
+        return None
+
+    if not (isinstance(short_ema_period, int) and short_ema_period > 0 and
+            isinstance(long_ema_period, int) and long_ema_period > 0 and
+            isinstance(signal_period, int) and signal_period > 0):
+        # logger.warning("MACD: EMA periods must be positive integers.")
+        return None
+
+    if short_ema_period >= long_ema_period:
+        # logger.warning("MACD: Long EMA period must be greater than short EMA period.")
+        return None
+
+    prices = pd.Series([item[1] for item in historical_data], dtype=float)
+
+    # Minimum data points needed:
+    # To calculate the longest EMA (long_ema_period)
+    # Then, to calculate the signal line (EMA of MACD line, signal_period values of MACD needed)
+    # MACD line needs at least long_ema_period prices to have its first value.
+    # Signal line needs signal_period MACD values.
+    # To get a MACD value, you need `long_ema_period` prices.
+    # To get `signal_period` MACD values, you need `long_ema_period + signal_period - 1` prices.
+    # To detect a crossover (current and previous signal line & MACD line), we need one more point.
+    # So, min_data_len = long_ema_period + signal_period.
+    min_data_len = long_ema_period + signal_period
+    if len(prices) < min_data_len:
+        # logger.info(f"MACD: Insufficient data. Have {len(prices)}, need {min_data_len}")
+        return None
+
+    # Calculate Short and Long EMAs
+    short_ema = prices.ewm(span=short_ema_period, adjust=False, min_periods=short_ema_period).mean()
+    long_ema = prices.ewm(span=long_ema_period, adjust=False, min_periods=long_ema_period).mean()
+
+    # Calculate MACD Line
+    macd_line = short_ema - long_ema
+
+    # Calculate Signal Line (EMA of MACD Line)
+    signal_line = macd_line.ewm(span=signal_period, adjust=False, min_periods=signal_period).mean()
+
+    # Drop NaN values that result from EMA calculations (especially at the beginning)
+    # We need at least two valid (non-NaN) points for both macd_line and signal_line to check crossover
+    macd_line_valid = macd_line.dropna()
+    signal_line_valid = signal_line.dropna()
+
+    if len(macd_line_valid) < 2 or len(signal_line_valid) < 2:
+        # logger.info("MACD: Not enough valid MACD/Signal points for crossover detection after NaN drop.")
+        return 'hold' # Or None, but hold is safer if some values exist but not enough for crossover
+
+    # Get the most recent two values for comparison
+    # Ensure we are comparing points that are aligned (i.e., both exist for the same time period)
+    # This is tricky because dropna() might change lengths differently if NaNs are not aligned.
+    # A safer way is to get the last two values from the original series, if they are not NaN.
+
+    # Consider the intersection of valid indices
+    valid_indices = macd_line.index.intersection(signal_line.index)
+    if len(valid_indices) < 2:
+        return 'hold'
+
+    # Get last two values from the aligned series
+    macd_current = macd_line[valid_indices[-1]]
+    macd_previous = macd_line[valid_indices[-2]]
+    signal_current = signal_line[valid_indices[-1]]
+    signal_previous = signal_line[valid_indices[-2]]
+
+    # Check for crossover
+    # Buy signal: MACD Line crosses above Signal Line
+    if macd_previous < signal_previous and macd_current > signal_current:
+        return 'buy'
+    # Sell signal: MACD Line crosses below Signal Line
+    elif macd_previous > signal_previous and macd_current < signal_current:
+        return 'sell'
+
+    return 'hold'
